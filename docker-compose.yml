@@ -8,7 +8,7 @@
 #
 # Components:
 #   - databases.yml      : OLTP (source) and OLAP (warehouse) Postgres instances
-#   - infrastructure.yml : LocalStack (AWS emulator) and Terraform runner
+#   - infrastructure.yml : LocalStack (AWS emulator)
 #   - mock-services.yml  : Mock HubSpot API for local development
 #   - meltano.yml        : Meltano ELT and data seeder
 #

@@ -42,7 +42,6 @@ exclude = [
     ".venv",
     "mock_hubspot",      # Docker-only, deps installed in container
     "synthetic_data",    # Docker-only, deps installed in container
-    "terraform/lambda",  # Lambda functions with minimal deps
 ]
 
 [tool.vulture]
@@ -52,5 +51,4 @@ exclude = [
     ".venv/",
     "mock_hubspot/",     # Docker-only, deps installed in container
     "synthetic_data/",   # Docker-only, deps installed in container
-    "terraform/lambda/", # Lambda functions with minimal deps
 ]
