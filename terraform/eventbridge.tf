@@ -43,7 +43,7 @@ resource "aws_cloudwatch_event_rule" "daily_elt" {
   name                = "${var.project}-daily-elt"
   description         = "Trigger unified ELT pipeline daily at 6 AM UTC"
   schedule_expression = "cron(0 6 * * ? *)"
-  is_enabled          = false # Disabled by default in POC
+  state               = "ENABLED" # Enabled for ECS orchestration demo
 
   tags = local.common_tags
 }
@@ -56,7 +56,7 @@ resource "aws_cloudwatch_event_target" "trigger_meltano" {
   role_arn  = aws_iam_role.eventbridge_role.arn
 
   input = jsonencode({
-    job          = "elt-postgres"
+    job          = "elt-all"
     environment  = "dev"
     triggered_by = "scheduled"
   })
