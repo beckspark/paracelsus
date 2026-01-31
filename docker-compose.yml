@@ -61,18 +61,20 @@ services:
       timeout: 5s
       retries: 5
 
-  # Mock HubSpot API
+  # Mock HubSpot API (HTTPS on port 443 for tap-hubspot compatibility)
   mock-hubspot:
     build:
       context: ./mock_hubspot
       dockerfile: Dockerfile
     container_name: paracelsus-mock-hubspot
     ports:
-      - "8001:8000"
+      - "8443:443"  # HTTPS exposed on host port 8443
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      - hubspot-certs:/certs  # Share certs with meltano container
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-kf", "https://localhost:443/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -108,10 +110,13 @@ services:
       - TARGET_POSTGRES_DBNAME=analytics
       # dbt-postgres configuration
       - DBT_PROFILES_DIR=/project/dbt
+      # Note: SSL cert for mock-hubspot is patched in entrypoint.sh
+      # only for tap-hubspot's virtualenv, not globally
     volumes:
       - ./meltano:/project
       - ./dbt:/project/dbt  # Mount dbt project for dbt-postgres utility
       - meltano-data:/project/.meltano
+      - hubspot-certs:/certs:ro  # Self-signed cert from mock-hubspot
     depends_on:
       oltp-db:
         condition: service_healthy
@@ -119,10 +124,13 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
-    # DNS redirect: HubSpot API calls go to mock server
-    extra_hosts:
-      - "api.hubapi.com:host-gateway"
-    entrypoint: ["tail", "-f", "/dev/null"]  # Keep container running
+      mock-hubspot:
+        condition: service_healthy
+    # DNS redirect: HubSpot API calls go to mock-hubspot container
+    # Using Docker network alias - mock-hubspot resolves to the container IP
+    links:
+      - "mock-hubspot:api.hubapi.com"
+    # Entrypoint is defined in Dockerfile (installs SSL cert then runs CMD)
 
   # Terraform runner for LocalStack
   terraform:
@@ -168,6 +176,7 @@ volumes:
   oltp-data:
   olap-data:
   meltano-data:
+  hubspot-certs:  # Shared volume for mock HubSpot SSL certificates
 
 networks:
   default:

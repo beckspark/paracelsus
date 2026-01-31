@@ -1,5 +1,5 @@
 -- Staging model for HubSpot contacts from API
--- Data extracted via Meltano tap-hubspot (Singer format)
+-- Data extracted via Meltano tap-hubspot (meltanolabs v3 API)
 
 with source as (
     select * from {{ source('hubspot', 'contacts') }}
@@ -7,22 +7,22 @@ with source as (
 
 staged as (
     select
-        -- Primary key (HubSpot uses 'vid' or 'id' depending on tap version)
-        coalesce(id::text, vid::text) as contact_id,
+        -- Primary key
+        id::text as contact_id,
 
-        -- Attributes (tap-hubspot flattens properties)
-        properties__firstname as first_name,
-        properties__lastname as last_name,
-        properties__email as email,
-        properties__phone as phone,
-        properties__company as company,
-        properties__jobtitle as job_title,
-        properties__lifecyclestage as lifecycle_stage,
-        properties__hs_lead_status as lead_status,
+        -- Attributes (meltanolabs tap uses property_ prefix)
+        property_firstname as first_name,
+        property_lastname as last_name,
+        property_email as email,
+        property_phone as phone,
+        property_company as company,
+        property_jobtitle as job_title,
+        property_lifecyclestage as lifecycle_stage,
+        property_hs_lead_status as lead_status,
 
         -- Timestamps
-        properties__createdate::timestamp as created_at,
-        properties__lastmodifieddate::timestamp as updated_at,
+        property_createdate as created_at,
+        coalesce(property_lastmodifieddate, lastmodifieddate) as updated_at,
 
         -- Singer metadata
         _sdc_extracted_at,
