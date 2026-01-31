@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: dim_physician
+    description: Dimension table for supervising physicians
+    columns:
+      - name: physician_key
+        description: Surrogate key for physicians
+        tests:
+          - unique
+          - not_null
+      - name: physician_id
+        description: Natural key (UUID from source)
+        tests:
+          - unique
+          - not_null
+      - name: npi
+        description: National Provider Identifier
+        tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: Concatenated first and last name
+        tests:
+          - not_null
+      - name: is_current
+        description: SCD current record flag
+        tests:
+          - not_null
+
+  - name: dim_provider
+    description: Dimension table for providers (NPs/PAs)
+    columns:
+      - name: provider_key
+        description: Surrogate key for providers
+        tests:
+          - unique
+          - not_null
+      - name: provider_id
+        description: Natural key (UUID from source)
+        tests:
+          - unique
+          - not_null
+      - name: provider_type
+        description: Type of provider
+        tests:
+          - accepted_values:
+              values: ['NP', 'PA']
+      - name: supervising_physician_key
+        description: Foreign key to dim_physician
+        tests:
+          - relationships:
+              to: ref('dim_physician')
+              field: physician_key
+
+  - name: dim_state
+    description: Dimension table for states
+    columns:
+      - name: state_key
+        description: Surrogate key for states
+        tests:
+          - unique
+          - not_null
+      - name: state_code
+        description: Two-letter state code
+        tests:
+          - unique
+          - not_null
+
+  - name: fact_provider_case_load
+    description: >
+      Fact table tracking physician case load metrics.
+      Grain: one row per physician per day.
+    columns:
+      - name: physician_key
+        description: Foreign key to dim_physician
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_physician')
+              field: physician_key
+      - name: date_key
+        description: Date of the metrics
+        tests:
+          - not_null
+      - name: cases_reviewed
+        description: Number of cases reviewed on this date
+        tests:
+          - not_null
+      - name: cases_pending_review
+        description: Number of cases pending review
+        tests:
+          - not_null
+      - name: cases_overdue
+        description: Number of overdue case reviews
+        tests:
+          - not_null
+      - name: workload_status
+        description: Workload indicator
+        tests:
+          - accepted_values:
+              values: ['normal', 'high', 'warning', 'critical']

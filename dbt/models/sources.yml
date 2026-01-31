@@ -1,0 +1,43 @@
+version: 2
+
+sources:
+  # OLTP source (replicated via Meltano tap-postgres)
+  - name: oltp
+    description: Provider supervision application database (OLTP)
+    database: analytics
+    schema: raw
+    tables:
+      - name: physicians
+        description: Physicians table from OLTP source via Meltano
+      - name: providers
+        description: Providers (NP/PA) table from OLTP source via Meltano
+      - name: cases
+        description: Patient cases table from OLTP source via Meltano
+      - name: case_reviews
+        description: Case reviews table from OLTP source via Meltano
+      - name: states
+        description: States reference table from OLTP source via Meltano
+
+  # S3 source (CSV files via Meltano tap-s3-csv)
+  - name: s3_landing
+    description: Files from S3 landing bucket via Meltano
+    database: analytics
+    schema: raw
+    tables:
+      - name: contacts_csv
+        description: HubSpot contacts CSV from S3
+      - name: deals_csv
+        description: HubSpot deals CSV from S3
+
+  # HubSpot API source (via Meltano tap-hubspot)
+  - name: hubspot
+    description: HubSpot CRM data via API
+    database: analytics
+    schema: raw
+    tables:
+      - name: contacts
+        description: HubSpot contacts from API
+      - name: companies
+        description: HubSpot companies from API
+      - name: deals
+        description: HubSpot deals from API

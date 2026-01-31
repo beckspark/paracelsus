@@ -1,0 +1,135 @@
+version: 1
+default_environment: dev
+project_id: paracelsus-elt
+
+environments:
+  - name: dev
+  - name: prod
+
+plugins:
+  extractors:
+    # PostgreSQL OLTP source - replicates provider supervision app data
+    - name: tap-postgres
+      variant: meltanolabs
+      pip_url: meltanolabs-tap-postgres
+      config:
+        host: ${TAP_POSTGRES_HOST}
+        port: ${TAP_POSTGRES_PORT}
+        user: ${TAP_POSTGRES_USER}
+        password: ${TAP_POSTGRES_PASSWORD}
+        database: ${TAP_POSTGRES_DATABASE}
+        default_replication_method: FULL_TABLE
+        filter_schemas:
+          - public
+      select:
+        - public-physicians.*
+        - public-providers.*
+        - public-cases.*
+        - public-case_reviews.*
+        - public-states.*
+
+    # S3 CSV source - files from LocalStack S3
+    - name: tap-s3-csv
+      variant: s7clarke10
+      pip_url: git+https://github.com/s7clarke10/pipelinewise-tap-s3-csv.git
+      config:
+        bucket: ${TAP_S3_CSV_BUCKET}
+        aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+        aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+        aws_endpoint_url: ${TAP_S3_CSV_AWS_ENDPOINT_URL}
+        start_date: "2024-01-01T00:00:00Z"
+        tables:
+          - table_name: contacts_csv
+            search_prefix: hubspot/
+            search_pattern: contacts\.csv
+            key_properties:
+              - id
+            delimiter: ","
+          - table_name: deals_csv
+            search_prefix: hubspot/
+            search_pattern: deals\.csv
+            key_properties:
+              - id
+            delimiter: ","
+
+    # HubSpot API source - mock API via DNS redirect
+    - name: tap-hubspot
+      variant: singer-io
+      pip_url: git+https://github.com/singer-io/tap-hubspot.git
+      config:
+        hapikey: ${TAP_HUBSPOT_API_KEY}
+        start_date: "2024-01-01T00:00:00Z"
+      select:
+        - contacts.*
+        - companies.*
+        - deals.*
+
+  loaders:
+    # PostgreSQL OLAP target - data warehouse
+    - name: target-postgres
+      variant: meltanolabs
+      pip_url: meltanolabs-target-postgres
+      config:
+        host: ${TARGET_POSTGRES_HOST}
+        port: ${TARGET_POSTGRES_PORT}
+        user: ${TARGET_POSTGRES_USER}
+        password: ${TARGET_POSTGRES_PASSWORD}
+        database: ${TARGET_POSTGRES_DBNAME}
+        default_target_schema: raw
+        add_metadata_columns: true
+        hard_delete: false
+
+  utilities:
+    # dbt-postgres for unified ELT pipeline
+    # Runs dbt commands after Meltano EL completes
+    # Note: executable: dbt is required when using custom pip_url
+    - name: dbt-postgres
+      variant: dbt-labs
+      pip_url: dbt-postgres~=1.7.0 dbt-core~=1.7.0
+      executable: dbt
+      config:
+        project_dir: /project/dbt
+        profiles_dir: /project/dbt
+
+jobs:
+  # Individual source jobs (EL only)
+  - name: el-postgres
+    tasks:
+      - tap-postgres target-postgres
+
+  - name: el-s3
+    tasks:
+      - tap-s3-csv target-postgres
+
+  - name: el-hubspot
+    tasks:
+      - tap-hubspot target-postgres
+
+  # Full EL job - runs all sources (no transform)
+  - name: el-all
+    tasks:
+      - tap-postgres target-postgres
+      - tap-s3-csv target-postgres
+      - tap-hubspot target-postgres
+
+  # Full ELT job - Extract, Load, then Transform with dbt
+  # This is the recommended job for production pipelines
+  - name: elt-postgres
+    tasks:
+      - tap-postgres target-postgres
+      - dbt-postgres:run
+      - dbt-postgres:test
+
+  # Full ELT with all sources
+  - name: elt-all
+    tasks:
+      - tap-postgres target-postgres
+      - tap-s3-csv target-postgres
+      - tap-hubspot target-postgres
+      - dbt-postgres:run
+      - dbt-postgres:test
+
+schedules:
+  - name: daily-elt
+    interval: "@daily"
+    job: elt-all

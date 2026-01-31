@@ -1,0 +1,103 @@
+version: 2
+
+models:
+  - name: stg_oltp__physicians
+    description: Staged physicians data from OLTP source via Meltano
+    columns:
+      - name: physician_id
+        description: Primary key for physicians (UUID as text)
+        tests:
+          - unique
+          - not_null
+      - name: npi
+        description: National Provider Identifier (10 digits)
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_oltp__providers
+    description: Staged providers (NPs/PAs) data from OLTP source via Meltano
+    columns:
+      - name: provider_id
+        description: Primary key for providers (UUID as text)
+        tests:
+          - unique
+          - not_null
+      - name: npi
+        description: National Provider Identifier
+        tests:
+          - unique
+          - not_null
+      - name: provider_type
+        description: Type of provider (NP or PA)
+        tests:
+          - accepted_values:
+              values: ['NP', 'PA']
+
+  - name: stg_oltp__cases
+    description: Staged patient cases from OLTP source via Meltano
+    columns:
+      - name: case_id
+        description: Primary key for cases (UUID as text)
+        tests:
+          - unique
+          - not_null
+      - name: status
+        description: Case status
+        tests:
+          - accepted_values:
+              values: ['open', 'closed', 'pending_review']
+
+  - name: stg_oltp__case_reviews
+    description: Staged case reviews from OLTP source via Meltano
+    columns:
+      - name: review_id
+        description: Primary key for reviews (UUID as text)
+        tests:
+          - unique
+          - not_null
+      - name: review_status
+        description: Review status
+        tests:
+          - accepted_values:
+              values: ['pending', 'completed', 'overdue']
+
+  - name: stg_oltp__states
+    description: Staged state reference data from OLTP source via Meltano
+    columns:
+      - name: state_id
+        description: Primary key for states (UUID as text)
+        tests:
+          - unique
+          - not_null
+      - name: state_code
+        description: Two-letter state code
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_s3__contacts
+    description: Staged HubSpot contacts from S3 CSV via Meltano
+    columns:
+      - name: contact_id
+        description: HubSpot contact ID
+        tests:
+          - not_null
+      - name: source_type
+        description: Source identifier (always 'csv' for this model)
+        tests:
+          - accepted_values:
+              values: ['csv']
+
+  - name: stg_hubspot__contacts
+    description: Staged HubSpot contacts from API via Meltano
+    columns:
+      - name: contact_id
+        description: HubSpot contact ID
+        tests:
+          - not_null
+      - name: source_type
+        description: Source identifier (always 'api' for this model)
+        tests:
+          - accepted_values:
+              values: ['api']

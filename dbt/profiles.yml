@@ -1,0 +1,12 @@
+paracelsus:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: olap-db
+      port: 5432
+      user: warehouse
+      password: olap_secret
+      dbname: analytics
+      schema: public
+      threads: 4
