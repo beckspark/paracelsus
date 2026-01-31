@@ -221,17 +221,6 @@ order by f.cases_overdue DESC;
 docker-compose exec localstack awslocal s3 ls
 ```
 
-## Why Meltano?
-
-| Aspect | Meltano | Airbyte |
-|--------|---------|---------|
-| Docker footprint | **1 container** | 14+ microservices |
-| Config format | **YAML** (like dbt) | JSON + UI |
-| dbt integration | **Native** (utility plugin) | Separate container |
-| Philosophy | **CLI-first**, scriptable | UI-first |
-| Connector ecosystem | 300+ Singer taps | 350+ connectors |
-| License | Apache 2.0 | MIT + enterprise tier |
-
 ## Development
 
 ### Prerequisites
