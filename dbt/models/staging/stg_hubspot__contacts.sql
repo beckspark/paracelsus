@@ -10,19 +10,19 @@ staged as (
         -- Primary key
         id::text as contact_id,
 
-        -- Attributes (meltanolabs tap uses property_ prefix)
-        property_firstname as first_name,
-        property_lastname as last_name,
-        property_email as email,
-        property_phone as phone,
-        property_company as company,
-        property_jobtitle as job_title,
-        property_lifecyclestage as lifecycle_stage,
-        property_hs_lead_status as lead_status,
+        -- Attributes (extracted from JSON properties column)
+        properties->>'firstname' as first_name,
+        properties->>'lastname' as last_name,
+        properties->>'email' as email,
+        properties->>'phone' as phone,
+        properties->>'company' as company,
+        properties->>'jobtitle' as job_title,
+        properties->>'lifecyclestage' as lifecycle_stage,
+        properties->>'hs_lead_status' as lead_status,
 
         -- Timestamps
-        property_createdate as created_at,
-        coalesce(property_lastmodifieddate, lastmodifieddate) as updated_at,
+        (properties->>'createdate')::timestamp as created_at,
+        coalesce((properties->>'lastmodifieddate')::timestamp, lastmodifieddate) as updated_at,
 
         -- Singer metadata
         _sdc_extracted_at,

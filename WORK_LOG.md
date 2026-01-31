@@ -1,5 +1,72 @@
 # Paracelsus Work Log
 
+## 2026-01-31: Python Version Upgrade & Dead Code Analysis
+
+### Objective
+1. Upgrade Python versions across all containers to latest supported versions
+2. Add vulture for dead code analysis to pre-commit hooks
+
+### Changes Made
+
+#### Python Version Upgrades
+
+| Component | Before | After | Notes |
+|-----------|--------|-------|-------|
+| `.python-version` | 3.13 | 3.14 | Local development |
+| `pyproject.toml` | `>=3.12` | `>=3.14` | Package requirement |
+| `mock_hubspot/Dockerfile` | 3.12-slim | 3.14-slim | Full 3.14 support |
+| `synthetic_data/Dockerfile` | 3.12-slim | 3.14-slim | Upgraded psycopg2-binary to 2.9.11 |
+| `meltano/Dockerfile` | 3.11-slim | 3.12-slim | Limited by dbt-postgres/msgspec |
+
+**Why meltano stays at 3.12:**
+- dbt-postgres doesn't support Python 3.14 ([GitHub #12098](https://github.com/dbt-labs/dbt-core/issues/12098)) - blocked by mashumaro and Pydantic V1 EOL
+- msgspec (tap-s3-csv dependency) lacks 3.13 wheels ([GitHub #764](https://github.com/jcrist/msgspec/issues/764))
+- Python 3.12 is the highest version with full wheel support for all Meltano plugins
+
+#### Vulture Dead Code Analysis
+
+Added vulture to pre-commit hooks:
+
+**pyproject.toml:**
+```toml
+[tool.vulture]
+min_confidence = 80
+paths = ["."]
+exclude = [".venv/", "mock_hubspot/", "synthetic_data/", "terraform/lambda/"]
+```
+
+**.pre-commit-config.yaml:**
+```yaml
+- id: vulture
+  name: vulture
+  entry: uv run vulture
+  language: system
+  types: [python]
+  pass_filenames: false
+```
+
+#### dbt Model Fix
+
+Updated `stg_hubspot__contacts.sql` to extract from JSON `properties` column instead of flattened columns:
+```sql
+properties->>'firstname' as first_name,  -- was: property_firstname
+```
+
+### Results
+- All pre-commit hooks pass (ruff, ruff-format, basedpyright, vulture)
+- Full ELT pipeline works with upgraded Python versions
+- 7,620 rows in `fact_provider_case_load`
+
+### Technical Decisions
+
+1. **3.14 where possible, 3.12 for meltano**: Maximized Python version while respecting ecosystem constraints. Mock services and seeder get 3.14; meltano needs 3.12 for dependency compatibility.
+
+2. **Vulture at 80% confidence**: Standard threshold balances false positive reduction with catching actual dead code.
+
+3. **psycopg2-binary upgrade**: 2.9.11 required for Python 3.14 wheels (2.9.9 lacked them).
+
+---
+
 ## 2026-01-31: Full ELT Pipeline Working
 
 ### Objective
@@ -97,7 +164,7 @@ docker-compose exec meltano meltano invoke dbt-postgres test
 
 # Patch tap-hubspot SSL (after meltano install)
 docker-compose exec meltano bash -c '
-TAP_CERTIFI="/project/.meltano/extractors/tap-hubspot/venv/lib/python3.11/site-packages/certifi/cacert.pem"
+TAP_CERTIFI="/project/.meltano/extractors/tap-hubspot/venv/lib/python3.12/site-packages/certifi/cacert.pem"
 cat /certs/cert.pem >> "$TAP_CERTIFI"
 '
 

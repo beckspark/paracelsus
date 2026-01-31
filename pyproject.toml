@@ -3,7 +3,7 @@ name = "paracelsus"
 version = "0.1.0"
 description = "AWS ELT Pipeline POC with LocalStack, Meltano, and dbt"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = []
 
 [project.optional-dependencies]
@@ -11,6 +11,7 @@ dev = [
     "ruff>=0.8.3",
     "basedpyright>=1.14.0",
     "pre-commit>=3.6.0",
+    "vulture>=2.13",
 ]
 
 # Dependencies for synthetic data generation (used in Docker)
@@ -42,4 +43,14 @@ exclude = [
     "mock_hubspot",      # Docker-only, deps installed in container
     "synthetic_data",    # Docker-only, deps installed in container
     "terraform/lambda",  # Lambda functions with minimal deps
+]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["."]
+exclude = [
+    ".venv/",
+    "mock_hubspot/",     # Docker-only, deps installed in container
+    "synthetic_data/",   # Docker-only, deps installed in container
+    "terraform/lambda/", # Lambda functions with minimal deps
 ]
