@@ -1,0 +1,30 @@
+# Mock services: External API simulators for local development
+
+services:
+  # Mock HubSpot API (HTTPS on port 443 for tap-hubspot compatibility)
+  mock-hubspot:
+    build:
+      context: ../mock_hubspot
+      dockerfile: Dockerfile
+    container_name: paracelsus-mock-hubspot
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "mock"
+    ports:
+      - "8443:443"  # HTTPS exposed on host port 8443
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - hubspot-certs:/certs  # Share certs with meltano container
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost:443/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      default:
+        aliases:
+          - api.hubapi.com  # DNS alias so any container on the network can resolve HubSpot API
+
+volumes:
+  hubspot-certs:  # Shared volume for mock HubSpot SSL certificates

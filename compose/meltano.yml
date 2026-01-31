@@ -1,0 +1,86 @@
+# ELT services: Meltano (Extract, Load, Transform) and data seeding
+
+services:
+  # Meltano ELT (Extract, Load, Transform) - unified container
+  # Includes dbt-postgres utility for running dbt transforms
+  meltano:
+    build:
+      context: ../meltano
+      dockerfile: Dockerfile
+    container_name: paracelsus-meltano
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "elt"
+    environment:
+      - MELTANO_ENVIRONMENT=dev
+      # tap-postgres (OLTP source)
+      - TAP_POSTGRES_HOST=oltp-db
+      - TAP_POSTGRES_PORT=5432
+      - TAP_POSTGRES_USER=admin
+      - TAP_POSTGRES_PASSWORD=oltp_secret
+      - TAP_POSTGRES_DATABASE=supervision
+      # tap-s3-csv (LocalStack S3)
+      - TAP_S3_CSV_BUCKET=paracelsus-landing
+      - TAP_S3_CSV_AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      # tap-hubspot (Mock API via DNS redirect)
+      - TAP_HUBSPOT_API_KEY=mock-api-key-for-local-development
+      # target-postgres (OLAP warehouse)
+      - TARGET_POSTGRES_HOST=olap-db
+      - TARGET_POSTGRES_PORT=5432
+      - TARGET_POSTGRES_USER=warehouse
+      - TARGET_POSTGRES_PASSWORD=olap_secret
+      - TARGET_POSTGRES_DBNAME=analytics
+      # dbt-postgres configuration
+      - DBT_PROFILES_DIR=/project/dbt
+      # Note: SSL cert for mock-hubspot is patched in entrypoint.sh
+      # only for tap-hubspot's virtualenv, not globally
+    volumes:
+      - ../meltano:/project
+      - ../dbt:/project/dbt  # Mount dbt project for dbt-postgres utility
+      - meltano-data:/project/.meltano
+      - hubspot-certs:/certs:ro  # Self-signed cert from mock-hubspot
+    depends_on:
+      oltp-db:
+        condition: service_healthy
+      olap-db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      mock-hubspot:
+        condition: service_healthy
+    # DNS redirect: HubSpot API calls go to mock-hubspot via network alias
+    # (api.hubapi.com alias defined in compose/mock-services.yml)
+    # Entrypoint is defined in Dockerfile (installs SSL cert then runs CMD)
+
+  # Synthetic data seeder
+  seeder:
+    build:
+      context: ../synthetic_data
+      dockerfile: Dockerfile
+    container_name: paracelsus-seeder
+    restart: "no"  # One-shot container, no restart
+    labels:
+      com.paracelsus.component: "elt"
+    environment:
+      - OLTP_HOST=oltp-db
+      - OLTP_PORT=5432
+      - OLTP_USER=admin
+      - OLTP_PASSWORD=oltp_secret
+      - OLTP_DB=supervision
+      - LOCALSTACK_HOST=localstack
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    depends_on:
+      oltp-db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ../synthetic_data:/app
+
+volumes:
+  meltano-data:

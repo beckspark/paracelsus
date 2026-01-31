@@ -1,0 +1,14 @@
+# act configuration for local GitHub Actions execution
+# See: https://github.com/nektos/act
+
+# Connect to the paracelsus docker network for database access
+--network=paracelsus-network
+
+# Use medium-sized runner image (faster than full ubuntu)
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Load local secrets
+--secret-file=.github/act/.env
+
+# Set environment variables
+--env-file=.github/act/.env

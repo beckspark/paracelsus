@@ -1,0 +1,112 @@
+name: ELT Pipeline
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Meltano job to run'
+        required: false
+        default: 'elt-all'
+        type: choice
+        options:
+          - elt-all
+          - elt-postgres
+          - el-all
+          - el-postgres
+
+env:
+  MELTANO_ENVIRONMENT: dev
+
+jobs:
+  run-elt:
+    runs-on: ubuntu-latest
+    # For local execution with act, we override with --container-architecture
+    # and use the paracelsus-meltano image directly
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Meltano
+        run: |
+          pip install meltano
+          cd meltano && meltano install
+
+      - name: Install mock-hubspot certificate (local only)
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        working-directory: meltano
+        run: |
+          # Install docker CLI if not available (act runner may not have it)
+          if ! command -v docker &> /dev/null; then
+            echo "Installing docker CLI..."
+            curl -fsSL https://get.docker.com | sh -s -- --version 24.0
+          fi
+
+          # Export cert from mock-hubspot container (only works when running via act)
+          CERT_FILE=$(mktemp)
+          if docker cp paracelsus-mock-hubspot:/certs/cert.pem "$CERT_FILE" 2>/dev/null; then
+            echo "Installing mock-hubspot certificate..."
+
+            # Install to system Python's certifi
+            CERTIFI_PATH=$(python -c "import certifi; print(certifi.where())")
+            cat "$CERT_FILE" >> "$CERTIFI_PATH"
+            echo "Certificate installed to $CERTIFI_PATH"
+
+            # Also install to tap-hubspot's virtualenv certifi (if it exists)
+            TAP_HUBSPOT_VENV=".meltano/extractors/tap-hubspot/venv"
+            if [ -d "$TAP_HUBSPOT_VENV" ]; then
+              TAP_CERTIFI=$("$TAP_HUBSPOT_VENV/bin/python" -c "import certifi; print(certifi.where())" 2>/dev/null || true)
+              if [ -n "$TAP_CERTIFI" ] && [ -f "$TAP_CERTIFI" ]; then
+                cat "$CERT_FILE" >> "$TAP_CERTIFI"
+                echo "Certificate also installed to tap-hubspot venv: $TAP_CERTIFI"
+              fi
+            fi
+          else
+            echo "No mock-hubspot certificate found (expected in real GitHub Actions)"
+          fi
+          rm -f "$CERT_FILE"
+
+      - name: Run ELT Pipeline
+        working-directory: meltano
+        run: |
+          meltano --environment ${{ env.MELTANO_ENVIRONMENT }} run ${{ inputs.job || 'elt-all' }}
+        env:
+          # OLTP Source
+          TAP_POSTGRES_HOST: ${{ vars.TAP_POSTGRES_HOST || 'oltp-db' }}
+          TAP_POSTGRES_PORT: ${{ vars.TAP_POSTGRES_PORT || '5432' }}
+          TAP_POSTGRES_USER: ${{ vars.TAP_POSTGRES_USER || 'admin' }}
+          TAP_POSTGRES_PASSWORD: ${{ secrets.OLTP_PASSWORD }}
+          TAP_POSTGRES_DATABASE: ${{ vars.TAP_POSTGRES_DATABASE || 'supervision' }}
+          # S3 Source (LocalStack)
+          TAP_S3_CSV_BUCKET: ${{ vars.TAP_S3_CSV_BUCKET || 'paracelsus-landing' }}
+          TAP_S3_CSV_AWS_ENDPOINT_URL: ${{ vars.TAP_S3_CSV_AWS_ENDPOINT_URL || 'http://localstack:4566' }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'test' }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'test' }}
+          # HubSpot Source
+          TAP_HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          # OLAP Target
+          TARGET_POSTGRES_HOST: ${{ vars.TARGET_POSTGRES_HOST || 'olap-db' }}
+          TARGET_POSTGRES_PORT: ${{ vars.TARGET_POSTGRES_PORT || '5432' }}
+          TARGET_POSTGRES_USER: ${{ vars.TARGET_POSTGRES_USER || 'warehouse' }}
+          TARGET_POSTGRES_PASSWORD: ${{ secrets.OLAP_PASSWORD }}
+          TARGET_POSTGRES_DBNAME: ${{ vars.TARGET_POSTGRES_DBNAME || 'analytics' }}
+          # dbt Configuration (override meltano.yml paths for CI)
+          DBT_POSTGRES_PROJECT_DIR: ${{ github.workspace }}/dbt
+          DBT_POSTGRES_PROFILES_DIR: ${{ github.workspace }}/dbt
+          DBT_POSTGRES_HOST: ${{ vars.TARGET_POSTGRES_HOST || 'olap-db' }}
+          DBT_POSTGRES_PORT: ${{ vars.TARGET_POSTGRES_PORT || '5432' }}
+          DBT_POSTGRES_USER: ${{ vars.TARGET_POSTGRES_USER || 'warehouse' }}
+          DBT_POSTGRES_PASSWORD: ${{ secrets.OLAP_PASSWORD }}
+          DBT_POSTGRES_DBNAME: ${{ vars.TARGET_POSTGRES_DBNAME || 'analytics' }}
+
+      - name: Report Status
+        if: always()
+        run: |
+          echo "Job completed with status: ${{ job.status }}"
