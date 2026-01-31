@@ -1,0 +1,47 @@
+# Infrastructure services: LocalStack (AWS emulator) and Terraform runner
+
+services:
+  # LocalStack - AWS services emulator
+  localstack:
+    image: localstack/localstack:3.4
+    container_name: paracelsus-localstack
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "infrastructure"
+    ports:
+      - "4566:4566"  # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - DEBUG=1
+      - SERVICES=s3,lambda,events,iam,logs,ecs,stepfunctions,sqs,sns
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      # ECS tasks join our Docker network for service discovery
+      - MAIN_DOCKER_NETWORK=paracelsus-network
+    volumes:
+      - "../localstack-data:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "../terraform/lambda:/opt/code/localstack/lambda"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Terraform runner for LocalStack
+  terraform:
+    image: hashicorp/terraform:1.7
+    container_name: paracelsus-terraform
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "infrastructure"
+    working_dir: /terraform
+    volumes:
+      - ../terraform:/terraform
+    env_file:
+      - ../.env
+    depends_on:
+      localstack:
+        condition: service_healthy
+    entrypoint: ["tail", "-f", "/dev/null"]  # Keep container running

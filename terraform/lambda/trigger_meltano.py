@@ -10,7 +10,6 @@ For LocalStack POC, we simulate the execution.
 """
 
 import os
-import subprocess
 
 
 def handler(event, context):
@@ -186,39 +185,3 @@ def execute_meltano_job(job: str, environment: str) -> dict:
         "tests_passed": config.get("tests_passed", 0),
         "message": f"Meltano job '{job}' completed: {el_part}{t_part}",
     }
-
-
-def trigger_meltano_container(job: str, environment: str) -> dict:
-    """Trigger Meltano via Docker exec (for local development).
-
-    This demonstrates how to invoke Meltano in a real deployment.
-    """
-    cmd = [
-        "docker",
-        "exec",
-        "paracelsus-meltano",
-        "meltano",
-        "--environment",
-        environment,
-        "run",
-        job,
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "message": "Meltano job completed" if result.returncode == 0 else "Meltano job failed",
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "message": "Meltano job timed out after 900 seconds",
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Failed to execute Meltano: {e}",
-        }

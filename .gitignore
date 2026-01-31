@@ -63,9 +63,11 @@ Thumbs.db
 
 # Secrets (never commit)
 .env
+!.env.example
 *.pem
 *.key
 credentials.json
+.github/act/.env
 
 # Claude Code working files
 .claude/

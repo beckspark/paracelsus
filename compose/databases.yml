@@ -1,0 +1,52 @@
+# Database services: OLTP (source) and OLAP (warehouse)
+# These represent RDS instances in production
+
+services:
+  # PostgreSQL OLTP (represents RDS in production)
+  # Note: Using direct Postgres as LocalStack RDS Community has limitations
+  oltp-db:
+    image: postgres:16-alpine
+    container_name: paracelsus-oltp
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "database"
+    environment:
+      POSTGRES_USER: ${OLTP_USER}
+      POSTGRES_PASSWORD: ${OLTP_PASSWORD}
+      POSTGRES_DB: ${OLTP_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - oltp-data:/var/lib/postgresql/data
+      - ../synthetic_data/init_oltp.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL OLAP (Data Warehouse)
+  olap-db:
+    image: postgres:16-alpine
+    container_name: paracelsus-olap
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "database"
+    environment:
+      POSTGRES_USER: ${OLAP_USER}
+      POSTGRES_PASSWORD: ${OLAP_PASSWORD}
+      POSTGRES_DB: ${OLAP_DB}
+    ports:
+      - "5435:5432"
+    volumes:
+      - olap-data:/var/lib/postgresql/data
+      - ../scripts/init_olap.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  oltp-data:
+  olap-data:

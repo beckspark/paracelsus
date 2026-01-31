@@ -15,9 +15,10 @@ if [ -f /certs/cert.pem ]; then
     fi
 
     # Also patch tap-hubspot's virtualenv certifi if it exists
-    TAP_CERTIFI="/project/.meltano/extractors/tap-hubspot/venv/lib/python3.11/site-packages/certifi/cacert.pem"
-    if [ -f "$TAP_CERTIFI" ]; then
-        echo "Appending cert to tap-hubspot certifi CA bundle"
+    # Use glob to handle any Python version (3.11, 3.12, etc.)
+    TAP_CERTIFI=$(find /project/.meltano/extractors/tap-hubspot/venv/lib -name "cacert.pem" -path "*/certifi/*" 2>/dev/null | head -1)
+    if [ -n "$TAP_CERTIFI" ] && [ -f "$TAP_CERTIFI" ]; then
+        echo "Appending cert to tap-hubspot certifi CA bundle: $TAP_CERTIFI"
         cat /certs/cert.pem >> "$TAP_CERTIFI"
     fi
 

@@ -25,5 +25,9 @@ COPY . /app/
 # Expose both HTTP (for health checks) and HTTPS (for tap-hubspot)
 EXPOSE 443
 
+# Health check using curl with -k to skip SSL verification
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -fk https://localhost:443/health || exit 1
+
 # Run with SSL on port 443
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "443", "--ssl-keyfile", "/certs/key.pem", "--ssl-certfile", "/certs/cert.pem"]
