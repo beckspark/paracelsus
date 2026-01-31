@@ -65,7 +65,3 @@ credentials.json
 
 # Claude Code working files
 .claude/
-
-# README - user will commit separately after review
-README.md
-
