@@ -1,6 +1,6 @@
 # Paracelsus: AWS ELT Pipeline POC
 
-Meltano proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for provider supervision case load analytics.
+[Meltano](https://meltano.com) proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for provider supervision case load analytics.
 
 ## Quick Start
 
