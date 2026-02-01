@@ -13,7 +13,7 @@ A single GitHub Action run (which can be triggered in production via cron, etc):
 4. Triggers a full dbt run on the raw data written, to get our final analytical marts.
 5. Writes its state back to the source S3 bucket, and disposes of the meltano container.
 
-[Source idea for this worflow](https://github.com/brooklyn-data/meltano-on-github-actions)
+[Source idea for this workflow](https://github.com/brooklyn-data/meltano-on-github-actions)
 
 ## Quick Start
 
