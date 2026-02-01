@@ -1,6 +1,6 @@
 # Paracelsus: AWS ELT Pipeline POC
 
-[Meltano](https://meltano.com) proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for provider supervision case load analytics. Demonstrates a data ingestion flow using "modern" architecture and orchestration--a GitHub action on a cron triggers the creation of an ephemeral Meltano service (that, in this case, persists its state json to an AWS S3 bucket it also reads csv files from) to "tap" the various pipeline data sources and "target" a Postgres OLAP database. The example data sources here include:
+[Meltano](https://meltano.com) proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for an example healthcare app that provides medical supervision case load analytics. Demonstrates a data ingestion flow using "modern" architecture and orchestration--a GitHub action on a cron triggers the creation of an ephemeral Meltano service (that, in this case, persists its state json to an AWS S3 bucket it also reads csv files from) to "tap" the various pipeline data sources and "target" a Postgres OLAP database. The example data sources here include:
 
 - CSV data from an S3 bucket (simulated with Localstack)
 - OLTP data from the same Postgres instance as our OLAP schema.
