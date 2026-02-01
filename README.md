@@ -1,12 +1,26 @@
 # Paracelsus: AWS ELT Pipeline POC
 
-[Meltano](https://meltano.com) proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for provider supervision case load analytics.
+[Meltano](https://meltano.com) proof-of-concept demonstrating an ephemeral GitHub Action-triggered ELT pipeline for provider supervision case load analytics. Demonstrates a data ingestion flow using "modern" architecture and orchestration--a GitHub action on a cron triggers the creation of an ephemeral Meltano service (that, in this case, persists its state json to an AWS S3 bucket it also reads csv files from) to "tap" the various pipeline data sources and "target" a Postgres OLAP database. The example data sources here include:
+
+- CSV data from an S3 bucket (simulated with Localstack)
+- OLTP data from the same Postgres instance as our OLAP schema.
+- "HubSpot" data via a mock-HubSpot FastAPI container that sends synthetic data to the official meltano hubspot "tap" (connector).
+
+A single GitHub Action run (which can be triggered in production via cron, etc):
+1. "Spins up" the ephemeral meltano container
+2. "Taps" the various data sources
+3. "Targets" an OLAP Postgres database (in this PoC, a separate container in the docker network)
+4. Triggers a full dbt run on the raw data written, to get our final analytical marts.
+5. Writes its state back to the source S3 bucket, and disposes of the meltano container.
+
+[Source idea for this worflow](https://github.com/brooklyn-data/meltano-on-github-actions)
 
 ## Quick Start
 
 ```bash
 # Copy environment template (required)
 cp .env.example .env
+cp .github/actions/.env.example .github/actions/.env
 
 # Start all services
 docker-compose up -d
@@ -14,10 +28,7 @@ docker-compose up -d
 # Wait for services to initialize, then run setup
 ./scripts/init.sh
 
-# Run the full ELT pipeline (all 3 sources + dbt transforms)
-docker-compose exec meltano meltano run elt-all
-
-# Alternative: Run via GitHub Actions locally
+# Run the full ELT pipeline (all 3 sources + dbt transforms) via GitHub Actions
 ./scripts/run-elt.sh elt-all
 
 # Query the results
