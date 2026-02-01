@@ -24,12 +24,13 @@ NC='\033[0m' # No Color
 wait_for_service() {
     local service=$1
     local url=$2
+    local curl_flags=${3:-}
     local max_attempts=30
     local attempt=1
 
     echo -e "${YELLOW}Waiting for $service...${NC}"
     while [ $attempt -le $max_attempts ]; do
-        if curl -s "$url" > /dev/null 2>&1; then
+        if curl -s $curl_flags "$url" > /dev/null 2>&1; then
             echo -e "${GREEN}$service is ready!${NC}"
             return 0
         fi
@@ -45,7 +46,7 @@ wait_for_service() {
 echo ""
 echo "Step 1: Waiting for services to be ready..."
 wait_for_service "LocalStack" "http://localhost:4566/_localstack/health"
-wait_for_service "Mock HubSpot" "http://localhost:8001/health"
+wait_for_service "Mock HubSpot" "https://localhost:8443/health" "-k"
 
 # Step 2: Verify LocalStack resources
 echo ""
