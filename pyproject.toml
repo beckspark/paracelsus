@@ -41,6 +41,7 @@ typeCheckingMode = "basic"
 exclude = [
     ".venv",
     "mock_hubspot",      # Docker-only, deps installed in container
+    "mock_emr",          # Docker-only, deps installed in container
     "synthetic_data",    # Docker-only, deps installed in container
 ]
 
@@ -50,5 +51,6 @@ paths = ["."]
 exclude = [
     ".venv/",
     "mock_hubspot/",     # Docker-only, deps installed in container
+    "mock_emr/",         # Docker-only, deps installed in container
     "synthetic_data/",   # Docker-only, deps installed in container
 ]

@@ -26,5 +26,24 @@ services:
         aliases:
           - api.hubapi.com  # DNS alias so any container on the network can resolve HubSpot API
 
+  # Mock FHIR R4 EMR API (plain HTTP on port 8080)
+  mock-emr:
+    build:
+      context: ../mock_emr
+      dockerfile: Dockerfile
+    container_name: paracelsus-mock-emr
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "mock"
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   hubspot-certs:  # Shared volume for mock HubSpot SSL certificates

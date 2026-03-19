@@ -100,3 +100,39 @@ models:
         tests:
           - accepted_values:
               values: ['normal', 'high', 'warning', 'critical']
+
+  - name: dim_patient
+    description: Dimension table for patients from EMR
+    columns:
+      - name: patient_key
+        description: Surrogate key for patients
+        tests:
+          - unique
+          - not_null
+      - name: patient_id
+        description: Natural key (FHIR Patient resource ID)
+        tests:
+          - unique
+          - not_null
+
+  - name: fact_patient_utilization
+    description: >
+      Fact table tracking provider patient utilization metrics.
+      Grain: one row per provider per day.
+    columns:
+      - name: provider_key
+        description: Foreign key to dim_provider
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_provider')
+              field: provider_key
+      - name: date_key
+        description: Date of the metrics
+        tests:
+          - not_null
+      - name: utilization_status
+        description: Utilization indicator
+        tests:
+          - accepted_values:
+              values: ['well_utilized', 'moderate', 'underutilized', 'high_no_show']

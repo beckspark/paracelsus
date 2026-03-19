@@ -72,6 +72,38 @@ plugins:
       select:
         - contacts.*
 
+    # FHIR R4 EMR source - generic REST API tap consuming FHIR Bundles
+    # Pagination: FHIR returns link[relation=next].url in JSON body.
+    # hateoas_body response style parses the extracted URL into path + query params.
+    # When no "next" link exists (last page), jsonpath returns None -> pagination stops.
+    - name: tap-rest-api-msdk
+      variant: widen
+      pip_url: tap-rest-api-msdk "setuptools<81"
+      config:
+        api_url: ${MOCK_FHIR_BASE_URL}
+        pagination_request_style: default
+        pagination_response_style: hateoas_body
+        next_page_token_path: "$.link[?relation='next'].url"
+        streams:
+          - name: fhir_patients
+            path: /fhir/Patient
+            primary_keys: [id]
+            records_path: "$.entry[*].resource"
+            params:
+              _count: "50"
+          - name: fhir_appointments
+            path: /fhir/Appointment
+            primary_keys: [id]
+            records_path: "$.entry[*].resource"
+            params:
+              _count: "50"
+          - name: fhir_encounters
+            path: /fhir/Encounter
+            primary_keys: [id]
+            records_path: "$.entry[*].resource"
+            params:
+              _count: "50"
+
   loaders:
     # PostgreSQL OLAP target - data warehouse
     - name: target-postgres
@@ -113,12 +145,17 @@ jobs:
     tasks:
       - tap-hubspot target-postgres
 
+  - name: el-emr
+    tasks:
+      - tap-rest-api-msdk target-postgres
+
   # Full EL job - runs all sources (no transform)
   - name: el-all
     tasks:
       - tap-postgres target-postgres
       - tap-s3-csv target-postgres
       - tap-hubspot target-postgres
+      - tap-rest-api-msdk target-postgres
 
   # Full ELT job - Extract, Load, then Transform with dbt
   # This is the recommended job for production pipelines
@@ -134,6 +171,7 @@ jobs:
       - tap-postgres target-postgres
       - tap-s3-csv target-postgres
       - tap-hubspot target-postgres
+      - tap-rest-api-msdk target-postgres
       - dbt-postgres:run
       - dbt-postgres:test
 

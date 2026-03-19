@@ -101,3 +101,42 @@ models:
         tests:
           - accepted_values:
               values: ['api']
+
+  - name: stg_emr__patients
+    description: Staged FHIR R4 Patient resources from EMR via Meltano
+    columns:
+      - name: patient_id
+        description: FHIR Patient resource ID
+        tests:
+          - unique
+          - not_null
+      - name: mrn
+        description: Medical Record Number from FHIR identifier
+
+  - name: stg_emr__appointments
+    description: Staged FHIR R4 Appointment resources from EMR via Meltano
+    columns:
+      - name: appointment_id
+        description: FHIR Appointment resource ID
+        tests:
+          - unique
+          - not_null
+      - name: appointment_status
+        description: FHIR appointment status
+        tests:
+          - accepted_values:
+              values: ['booked', 'fulfilled', 'cancelled', 'noshow']
+
+  - name: stg_emr__encounters
+    description: Staged FHIR R4 Encounter resources from EMR via Meltano
+    columns:
+      - name: encounter_id
+        description: FHIR Encounter resource ID
+        tests:
+          - unique
+          - not_null
+      - name: encounter_status
+        description: FHIR encounter status
+        tests:
+          - accepted_values:
+              values: ['finished', 'in-progress', 'planned']

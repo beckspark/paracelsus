@@ -41,3 +41,16 @@ sources:
         description: HubSpot companies from API
       - name: deals
         description: HubSpot deals from API
+
+  # EMR FHIR R4 source (via Meltano tap-rest-api-msdk)
+  - name: emr
+    description: EMR FHIR R4 data via REST API
+    database: analytics
+    schema: raw
+    tables:
+      - name: fhir_patients
+        description: FHIR Patient resources from EMR
+      - name: fhir_appointments
+        description: FHIR Appointment resources from EMR
+      - name: fhir_encounters
+        description: FHIR Encounter resources from EMR

@@ -47,6 +47,7 @@ echo ""
 echo "Step 1: Waiting for services to be ready..."
 wait_for_service "LocalStack" "http://localhost:4566/_localstack/health"
 wait_for_service "Mock HubSpot" "https://localhost:8443/health" "-k"
+wait_for_service "Mock FHIR EMR" "http://localhost:8080/health"
 
 # Step 2: Verify LocalStack resources
 echo ""
