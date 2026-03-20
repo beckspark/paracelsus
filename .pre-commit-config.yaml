@@ -19,3 +19,8 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: sqlfmt
+        name: sqlfmt
+        entry: uv run sqlfmt
+        language: system
+        files: ^dbt/models/.*\.sql$

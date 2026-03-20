@@ -31,6 +31,8 @@ services:
         condition: service_healthy
       mock-emr:
         condition: service_healthy
+      mock-hl7-engine:
+        condition: service_healthy
     # DNS redirect: HubSpot API calls go to mock-hubspot via network alias
     # (api.hubapi.com alias defined in compose/mock-services.yml)
     # Entrypoint is defined in Dockerfile (installs SSL cert then runs CMD)
@@ -50,6 +52,8 @@ services:
       oltp-db:
         condition: service_healthy
       localstack:
+        condition: service_healthy
+      mock-hl7-engine:
         condition: service_healthy
     volumes:
       - ../synthetic_data:/app

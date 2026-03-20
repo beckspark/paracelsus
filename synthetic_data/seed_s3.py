@@ -1,4 +1,4 @@
-"""Seed S3 bucket with CSV/Excel files."""
+"""Seed S3 bucket with CSV/Excel files and send HL7v2 messages via MLLP."""
 
 import csv
 import io
@@ -9,7 +9,7 @@ import boto3
 import pandas as pd
 from botocore.config import Config
 from generate import generate_all_data
-from generate_hl7 import generate_hl7_csvs
+from generate_hl7 import send_hl7_messages
 
 
 def get_s3_client():
@@ -217,20 +217,8 @@ def upload_state_requirements_excel(s3_client, bucket_name: str):
     print(f"Uploaded state requirements to s3://{bucket_name}/reference/state_requirements.xlsx")
 
 
-def upload_hl7_csv(s3_client, bucket_name: str, key: str, csv_content: str, label: str):
-    """Upload a pre-built HL7 CSV string to S3."""
-    s3_client.put_object(
-        Bucket=bucket_name,
-        Key=key,
-        Body=csv_content.encode("utf-8"),
-        ContentType="text/csv",
-    )
-    row_count = csv_content.count("\n") - 1 if csv_content else 0
-    print(f"Uploaded {row_count} {label} rows to s3://{bucket_name}/{key}")
-
-
 def seed_s3():
-    """Main function to seed S3 with files."""
+    """Main function to seed S3 with files and send HL7v2 messages via MLLP."""
     bucket_name = "paracelsus-landing"
 
     print("Generating synthetic data...")
@@ -248,13 +236,9 @@ def seed_s3():
     upload_deals_csv(s3_client, bucket_name, hubspot_data["deals"])
     upload_state_requirements_excel(s3_client, bucket_name)
 
-    print("Generating HL7v2 messages...")
-    admissions_csv, discharges_csv, lab_results_csv = generate_hl7_csvs()
-
-    print("Uploading HL7 CSVs to S3...")
-    upload_hl7_csv(s3_client, bucket_name, "hl7/admissions.csv", admissions_csv, "admissions")
-    upload_hl7_csv(s3_client, bucket_name, "hl7/discharges.csv", discharges_csv, "discharges")
-    upload_hl7_csv(s3_client, bucket_name, "hl7/lab_results.csv", lab_results_csv, "lab results")
+    print("Sending HL7v2 messages to MLLP engine...")
+    hl7_host = os.environ.get("HL7_ENGINE_HOST", "mock-hl7-engine")
+    send_hl7_messages(host=hl7_host, port=2575)
 
     print("S3 seeding completed successfully!")
 

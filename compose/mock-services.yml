@@ -26,6 +26,25 @@ services:
         aliases:
           - api.hubapi.com  # DNS alias so any container on the network can resolve HubSpot API
 
+  # Mock HL7v2 MLLP engine (MLLP on port 2575, HTTP on port 8090)
+  mock-hl7-engine:
+    build:
+      context: ../mock_hl7_engine
+      dockerfile: Dockerfile
+    container_name: paracelsus-mock-hl7-engine
+    restart: unless-stopped
+    labels:
+      com.paracelsus.component: "mock"
+    ports:
+      - "8090:8090"  # HTTP exposed on host for debugging; MLLP port 2575 is internal only
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # Mock FHIR R4 EMR API (plain HTTP on port 8080)
   mock-emr:
     build:

@@ -1,18 +1,19 @@
-"""Generate mock HL7v2 messages (ADT^A01, ADT^A03, ORU^R01) and parse to CSV.
+"""Generate mock HL7v2 messages (ADT^A01, ADT^A03, ORU^R01) and send via MLLP.
 
 HL7v2 is a pipe-delimited message protocol transmitted over MLLP/TCP.
-Real pipelines use an integration engine (Mirth Connect, Apache Camel) to parse
-segments into flat files and drop them in S3. We mock this pattern by generating
-actual HL7v2 message strings, parsing them back into dicts, and writing CSVs.
+Real pipelines use an integration engine (Mirth Connect, Apache Camel) to receive
+messages, parse segments, and expose them for downstream consumption.
+We mock this by generating actual HL7v2 message strings and transmitting them
+to mock_hl7_engine over TCP/MLLP, which parses and serves them as JSON.
 
 NPI + MRN COORDINATION:
     Replicates seed sequences from synthetic_data/generate.py (provider NPIs) and
     mock_emr/generate_fixtures.py (patient MRNs). Same pattern as _replicate_oltp_seed_sequence().
 """
 
-import csv
-import io
 import random
+import socket
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -56,6 +57,10 @@ LAB_PANELS = {
         ("Triglycerides", "2571-8", "mg/dL", "0-150"),
     ],
 }
+
+# MLLP framing constants
+MLLP_START = b"\x0b"
+MLLP_END = b"\x1c\x0d"
 
 
 def _generate_npi() -> str:
@@ -218,108 +223,6 @@ def _build_obx(
 
 
 # ---------------------------------------------------------------------------
-# HL7v2 message parser (pipe-delimited → dict)
-# ---------------------------------------------------------------------------
-
-
-def _parse_hl7_segments(raw_message: str) -> dict[str, list[str]]:
-    """Parse raw HL7v2 message into segment name → list of fields."""
-    segments = {}
-    for line in raw_message.strip().split("\n"):
-        fields = line.split("|")
-        seg_name = fields[0]
-        if seg_name not in segments:
-            segments[seg_name] = []
-        segments[seg_name].append(fields)
-    return segments
-
-
-def _parse_admission(raw: str) -> dict:
-    segs = _parse_hl7_segments(raw)
-    msh = segs["MSH"][0]
-    pid = segs["PID"][0]
-    pv1 = segs["PV1"][0]
-
-    # PID: [3]=MRN, [5]=name(last^first), [7]=DOB, [8]=gender
-    name_parts = pid[5].split("^")
-    # PV1 (standard HL7): [2]=patient_class, [7]=attending, [19]=visit_number, [44]=admit_dt
-    attending = pv1[7].split("^") if len(pv1) > 7 else []
-
-    return {
-        "message_id": msh[9],
-        "patient_mrn": pid[3],
-        "patient_last_name": name_parts[0] if name_parts else "",
-        "patient_first_name": name_parts[1] if len(name_parts) > 1 else "",
-        "patient_dob": pid[7],
-        "patient_gender": pid[8],
-        "attending_provider_npi": attending[0] if attending else "",
-        "patient_class": pv1[2],
-        "admit_datetime": pv1[44] if len(pv1) > 44 else "",
-        "visit_number": pv1[19] if len(pv1) > 19 else "",
-        "sending_facility": msh[3],
-        "message_datetime": msh[6],
-    }
-
-
-def _parse_discharge(raw: str) -> dict:
-    segs = _parse_hl7_segments(raw)
-    msh = segs["MSH"][0]
-    pid = segs["PID"][0]
-    pv1 = segs["PV1"][0]
-
-    name_parts = pid[5].split("^")
-    # PV1 (standard HL7): [7]=attending, [19]=visit_number, [44]=admit_dt, [45]=discharge_dt
-    attending = pv1[7].split("^") if len(pv1) > 7 else []
-
-    return {
-        "message_id": msh[9],
-        "patient_mrn": pid[3],
-        "patient_last_name": name_parts[0] if name_parts else "",
-        "patient_first_name": name_parts[1] if len(name_parts) > 1 else "",
-        "attending_provider_npi": attending[0] if attending else "",
-        "patient_class": pv1[2],
-        "admit_datetime": pv1[44] if len(pv1) > 44 else "",
-        "discharge_datetime": pv1[45] if len(pv1) > 45 else "",
-        "visit_number": pv1[19] if len(pv1) > 19 else "",
-        "sending_facility": msh[3],
-        "message_datetime": msh[6],
-    }
-
-
-def _parse_lab_result(raw: str) -> list[dict]:
-    """Parse ORU^R01 into one dict per OBX segment."""
-    segs = _parse_hl7_segments(raw)
-    msh = segs["MSH"][0]
-    pid = segs["PID"][0]
-    obr = segs["OBR"][0]
-
-    name_parts = pid[5].split("^")
-    rows = []
-    for obx in segs.get("OBX", []):
-        test_parts = obx[3].split("^")
-        rows.append(
-            {
-                "message_id": msh[9],
-                "patient_mrn": pid[3],
-                "patient_last_name": name_parts[0] if name_parts else "",
-                "patient_first_name": name_parts[1] if len(name_parts) > 1 else "",
-                "ordering_provider_npi": obr[16],
-                "order_number": obr[2],
-                "test_code": test_parts[0] if test_parts else "",
-                "test_name": test_parts[1] if len(test_parts) > 1 else "",
-                "result_value": obx[5],
-                "result_units": obx[6],
-                "reference_range": obx[7],
-                "abnormal_flag": obx[8],
-                "observation_datetime": msh[6],
-                "sending_facility": msh[3],
-                "message_datetime": msh[6],
-            }
-        )
-    return rows
-
-
-# ---------------------------------------------------------------------------
 # Message generators
 # ---------------------------------------------------------------------------
 
@@ -463,43 +366,25 @@ def generate_hl7_messages(
     return adt_a01_messages, adt_a03_messages, oru_r01_messages
 
 
-def messages_to_csv(
-    adt_a01: list[str],
-    adt_a03: list[str],
-    oru_r01: list[str],
-) -> tuple[str, str, str]:
-    """Parse raw HL7v2 messages into CSV strings.
-
-    Returns (admissions_csv, discharges_csv, lab_results_csv).
-    """
-    # Parse admissions
-    admission_rows = [_parse_admission(msg) for msg in adt_a01]
-
-    # Parse discharges
-    discharge_rows = [_parse_discharge(msg) for msg in adt_a03]
-
-    # Parse lab results (one row per OBX)
-    lab_rows = []
-    for msg in oru_r01:
-        lab_rows.extend(_parse_lab_result(msg))
-
-    def _to_csv(rows: list[dict]) -> str:
-        if not rows:
-            return ""
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=rows[0].keys())
-        writer.writeheader()
-        writer.writerows(rows)
-        return output.getvalue()
-
-    return _to_csv(admission_rows), _to_csv(discharge_rows), _to_csv(lab_rows)
+# ---------------------------------------------------------------------------
+# MLLP sender
+# ---------------------------------------------------------------------------
 
 
-def generate_hl7_csvs() -> tuple[str, str, str]:
-    """Main entry point: generate HL7v2 messages and return CSV strings.
+def _mllp_send(sock: socket.socket, message: str) -> str:
+    """Send one MLLP-framed message and return the decoded ACK."""
+    sock.sendall(MLLP_START + message.encode() + MLLP_END)
+    buf = b""
+    while not buf.endswith(MLLP_END):
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+    return buf[1:-2].decode(errors="replace")  # strip MLLP framing
 
-    Returns (admissions_csv, discharges_csv, lab_results_csv).
-    """
+
+def send_hl7_messages(host: str = "mock-hl7-engine", port: int = 2575) -> None:
+    """Generate HL7v2 messages and transmit them to the MLLP engine via TCP."""
     provider_npis = _replicate_provider_npis()
     patients = _replicate_patient_mrns()
 
@@ -507,7 +392,6 @@ def generate_hl7_csvs() -> tuple[str, str, str]:
 
     adt_a01, adt_a03, oru_r01 = generate_hl7_messages(provider_npis, patients)
 
-    # Log sample messages for visibility
     print(f"HL7: Generated {len(adt_a01)} ADT^A01, {len(adt_a03)} ADT^A03, {len(oru_r01)} ORU^R01 messages")
     if adt_a01:
         print("--- Sample ADT^A01 ---")
@@ -518,20 +402,30 @@ def generate_hl7_csvs() -> tuple[str, str, str]:
         print(oru_r01[0])
         print("---")
 
-    admissions_csv, discharges_csv, lab_results_csv = messages_to_csv(adt_a01, adt_a03, oru_r01)
+    all_messages = adt_a01 + adt_a03 + oru_r01
+    total = len(all_messages)
+    print(f"HL7: Sending {total} messages to {host}:{port} via MLLP...")
 
-    admission_count = len(adt_a01)
-    discharge_count = len(adt_a03)
-    lab_row_count = lab_results_csv.count("\n") - 1 if lab_results_csv else 0
-    print(
-        f"HL7: Parsed to CSV — {admission_count} admissions, {discharge_count} discharges, {lab_row_count} lab results"
-    )
-
-    return admissions_csv, discharges_csv, lab_results_csv
+    max_retries = 10
+    for attempt in range(max_retries):
+        try:
+            with socket.create_connection((host, port), timeout=10) as sock:
+                for i, msg in enumerate(all_messages, 1):
+                    _mllp_send(sock, msg)
+                    if i % 50 == 0:
+                        print(f"HL7: Sent {i}/{total} messages...")
+            print(f"HL7: Successfully sent all {total} messages")
+            return
+        except (ConnectionRefusedError, OSError) as e:
+            if attempt < max_retries - 1:
+                print(f"HL7: Connection attempt {attempt + 1} failed ({e}), retrying in 2s...")
+                time.sleep(2)
+            else:
+                raise
 
 
 if __name__ == "__main__":
-    admissions, discharges, labs = generate_hl7_csvs()
-    print(f"\nAdmissions CSV rows: {admissions.count(chr(10)) - 1}")
-    print(f"Discharges CSV rows: {discharges.count(chr(10)) - 1}")
-    print(f"Lab results CSV rows: {labs.count(chr(10)) - 1}")
+    import os
+
+    host = os.environ.get("HL7_ENGINE_HOST", "localhost")
+    send_hl7_messages(host=host, port=2575)

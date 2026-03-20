@@ -1,6 +1,6 @@
 [project]
 name = "paracelsus"
-version = "0.1.0"
+version = "0.1.2"
 description = "AWS ELT Pipeline POC with LocalStack, Meltano, and dbt"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -12,6 +12,7 @@ dev = [
     "basedpyright>=1.14.0",
     "pre-commit>=3.6.0",
     "vulture>=2.13",
+    "shandy-sqlfmt[jinjafmt]>=0.28.2",
 ]
 
 # Dependencies for synthetic data generation (used in Docker)
@@ -42,6 +43,7 @@ exclude = [
     ".venv",
     "mock_hubspot",      # Docker-only, deps installed in container
     "mock_emr",          # Docker-only, deps installed in container
+    "mock_hl7_engine",   # Docker-only, deps installed in container
     "synthetic_data",    # Docker-only, deps installed in container
 ]
 
@@ -52,5 +54,6 @@ exclude = [
     ".venv/",
     "mock_hubspot/",     # Docker-only, deps installed in container
     "mock_emr/",         # Docker-only, deps installed in container
+    "mock_hl7_engine/",  # Docker-only, deps installed in container
     "synthetic_data/",   # Docker-only, deps installed in container
 ]

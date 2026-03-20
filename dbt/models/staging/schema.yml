@@ -142,7 +142,7 @@ models:
               values: ['finished', 'in-progress', 'planned']
 
   - name: stg_hl7__admissions
-    description: Staged HL7v2 ADT^A01 admission messages from S3 CSV
+    description: Staged HL7v2 ADT^A01 admission messages from MLLP engine via tap-hl7-engine
     columns:
       - name: message_id
         description: HL7 message control ID
@@ -156,7 +156,7 @@ models:
               values: ['I', 'E', 'O']
 
   - name: stg_hl7__discharges
-    description: Staged HL7v2 ADT^A03 discharge messages from S3 CSV
+    description: Staged HL7v2 ADT^A03 discharge messages from MLLP engine via tap-hl7-engine
     columns:
       - name: message_id
         description: HL7 message control ID
@@ -170,7 +170,7 @@ models:
               values: ['I', 'E', 'O']
 
   - name: stg_hl7__lab_results
-    description: Staged HL7v2 ORU^R01 lab result OBX segments from S3 CSV
+    description: Staged HL7v2 ORU^R01 lab result OBX segments from MLLP engine via tap-hl7-engine
     columns:
       - name: message_id
         description: HL7 message control ID (not unique — multiple OBX per message)

@@ -51,25 +51,6 @@ plugins:
             key_properties:
               - id
             delimiter: ","
-          - table_name: hl7_admissions
-            search_prefix: hl7/
-            search_pattern: admissions\.csv
-            key_properties:
-              - message_id
-            delimiter: ","
-          - table_name: hl7_discharges
-            search_prefix: hl7/
-            search_pattern: discharges\.csv
-            key_properties:
-              - message_id
-            delimiter: ","
-          - table_name: hl7_lab_results
-            search_prefix: hl7/
-            search_pattern: lab_results\.csv
-            key_properties:
-              - message_id
-            delimiter: ","
-
     # HubSpot API source - mock API via DNS redirect (v3 API)
     - name: tap-hubspot
       namespace: tap_hubspot
@@ -89,6 +70,28 @@ plugins:
         start_date: "2024-01-01T00:00:00Z"
       select:
         - contacts.*
+
+    # HL7v2 engine source - REST API serving parsed MLLP messages as JSON
+    # No pagination — all records served in a single response per endpoint.
+    # inherit_from reuses tap-rest-api-msdk pip_url without duplicating the plugin definition.
+    - name: tap-hl7-engine
+      inherit_from: tap-rest-api-msdk
+      config:
+        api_url: ${MOCK_HL7_BASE_URL}
+        pagination_request_style: default
+        streams:
+          - name: hl7_admissions
+            path: /hl7/admissions
+            primary_keys: [message_id]
+            records_path: "$.records[*]"
+          - name: hl7_discharges
+            path: /hl7/discharges
+            primary_keys: [message_id]
+            records_path: "$.records[*]"
+          - name: hl7_lab_results
+            path: /hl7/lab_results
+            primary_keys: [message_id, test_code]
+            records_path: "$.records[*]"
 
     # FHIR R4 EMR source - generic REST API tap consuming FHIR Bundles
     # Pagination: FHIR returns link[relation=next].url in JSON body.
@@ -167,6 +170,10 @@ jobs:
     tasks:
       - tap-rest-api-msdk target-postgres
 
+  - name: el-hl7
+    tasks:
+      - tap-hl7-engine target-postgres
+
   # Full EL job - runs all sources (no transform)
   - name: el-all
     tasks:
@@ -174,6 +181,7 @@ jobs:
       - tap-s3-csv target-postgres
       - tap-hubspot target-postgres
       - tap-rest-api-msdk target-postgres
+      - tap-hl7-engine target-postgres
 
   # Full ELT job - Extract, Load, then Transform with dbt
   # This is the recommended job for production pipelines
@@ -190,6 +198,7 @@ jobs:
       - tap-s3-csv target-postgres
       - tap-hubspot target-postgres
       - tap-rest-api-msdk target-postgres
+      - tap-hl7-engine target-postgres
       - dbt-postgres:run
       - dbt-postgres:test
 
