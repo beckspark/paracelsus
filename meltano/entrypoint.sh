@@ -23,6 +23,12 @@ if [ -f /certs/cert.pem ]; then
     fi
 
     echo "Certificate installed."
+
+    # Make all child processes (including tap virtualenvs) use the system cert bundle.
+    # This is necessary because tap venvs have their own certifi and may be installed
+    # after this entrypoint runs. REQUESTS_CA_BUNDLE overrides certifi in all venvs.
+    export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 fi
 
 # Execute the command passed to docker
