@@ -28,6 +28,12 @@ sources:
         description: HubSpot contacts CSV from S3
       - name: deals_csv
         description: HubSpot deals CSV from S3
+      - name: hl7_admissions
+        description: HL7v2 ADT^A01 admission messages parsed to CSV
+      - name: hl7_discharges
+        description: HL7v2 ADT^A03 discharge messages parsed to CSV
+      - name: hl7_lab_results
+        description: HL7v2 ORU^R01 lab result OBX segments parsed to CSV
 
   # HubSpot API source (via Meltano tap-hubspot)
   - name: hubspot

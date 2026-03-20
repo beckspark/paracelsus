@@ -51,6 +51,24 @@ plugins:
             key_properties:
               - id
             delimiter: ","
+          - table_name: hl7_admissions
+            search_prefix: hl7/
+            search_pattern: admissions\.csv
+            key_properties:
+              - message_id
+            delimiter: ","
+          - table_name: hl7_discharges
+            search_prefix: hl7/
+            search_pattern: discharges\.csv
+            key_properties:
+              - message_id
+            delimiter: ","
+          - table_name: hl7_lab_results
+            search_prefix: hl7/
+            search_pattern: lab_results\.csv
+            key_properties:
+              - message_id
+            delimiter: ","
 
     # HubSpot API source - mock API via DNS redirect (v3 API)
     - name: tap-hubspot
