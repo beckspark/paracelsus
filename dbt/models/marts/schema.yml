@@ -115,6 +115,31 @@ models:
           - unique
           - not_null
 
+  - name: fact_patient_encounters
+    description: >
+      Fact table for patient encounters from HL7 ADT messages.
+      Grain: one row per admission (visit_number).
+    columns:
+      - name: visit_number
+        description: Visit number from HL7 PV1 segment
+        tests:
+          - unique
+          - not_null
+      - name: admit_date_key
+        description: Admission date
+        tests:
+          - not_null
+      - name: patient_class
+        description: Patient class (I=Inpatient, E=Emergency, O=Outpatient)
+        tests:
+          - accepted_values:
+              values: ['I', 'E', 'O']
+      - name: adt_status
+        description: Current ADT status
+        tests:
+          - accepted_values:
+              values: ['admitted', 'discharged']
+
   - name: fact_patient_utilization
     description: >
       Fact table tracking provider patient utilization metrics.
