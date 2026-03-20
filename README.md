@@ -5,6 +5,8 @@
 - CSV data from an S3 bucket (simulated with Localstack)
 - OLTP data from the same Postgres instance as our OLAP schema.
 - "HubSpot" data via a mock-HubSpot FastAPI container that sends synthetic data to the official meltano hubspot "tap" (connector).
+- Mock FHIR R4 EMR data via a FastAPI container exposing patient and encounter resources.
+- HL7v2 ADT/ORU messages sent over MLLP/TCP to a mock integration engine, parsed and served via HTTP for tap-rest-api-msdk to consume.
 
 A single GitHub Action run (which can be triggered in production via cron, etc):
 1. "Spins up" the ephemeral meltano container
@@ -38,10 +40,13 @@ docker-compose exec olap-db psql -U warehouse -d analytics -c \
 
 **Expected results:**
 - tap-postgres: 350 records (physicians, providers, cases, case_reviews, states)
-- tap-s3-csv: 80 records (contacts_csv, deals_csv)
+- tap-s3-csv: ~150 records (contacts_csv, deals_csv)
+- tap-hl7-engine: ~658 records (hl7_admissions, hl7_discharges, hl7_lab_results)
 - tap-hubspot: 50 records (contacts)
-- dbt: 13 models, 48 tests passing
+- tap-fhir: 200 patients, ~800 encounters
+- dbt: 20+ models, 77 tests passing
 - fact_provider_case_load: ~7,620 rows
+- fact_patient_encounters: 80 rows (ADT admissions with cross-source EMR enrichment)
 
 ## Running Pipeline Locally (act)
 
@@ -116,9 +121,10 @@ paracelsus/
 │   ├── main.py
 │   └── Dockerfile
 ├── synthetic_data/             # Data generators
-│   ├── generate.py
+│   ├── generate.py             # OLTP + HubSpot data
+│   ├── generate_hl7.py         # HL7v2 message generator → MLLP sender
 │   ├── seed_oltp.py
-│   ├── seed_s3.py
+│   ├── seed_s3.py              # Uploads HubSpot CSVs to S3; sends HL7 via MLLP
 │   └── init_oltp.sql
 ├── dbt/                        # dbt transformation layer
 │   ├── dbt_project.yml
@@ -163,7 +169,7 @@ docker-compose exec meltano meltano invoke dbt-postgres test
 
 ### Data Sources
 
-Three source patterns demonstrated:
+Five source patterns demonstrated:
 
 1. **PostgreSQL → PostgreSQL** (database replication)
    ```bash
@@ -186,6 +192,19 @@ Three source patterns demonstrated:
    - Source: Mock HubSpot API (connector-compatible)
    - Objects: contacts, companies, deals
 
+4. **FHIR R4 → PostgreSQL** (EMR integration)
+   - Source: Mock FHIR R4 API serving synthetic patient and encounter resources
+   - Custom tap using the FHIR REST API
+
+5. **HL7v2 MLLP → PostgreSQL** (HL7 integration engine pattern)
+   ```bash
+   docker-compose exec meltano meltano run el-hl7
+   ```
+   - `generate_hl7.py` builds pipe-delimited HL7v2 strings and sends them over MLLP/TCP to `mock-hl7-engine`
+   - `mock-hl7-engine` receives messages on :2575, parses ADT/ORU segments, and serves flat JSON via HTTP on :8090
+   - `tap-hl7-engine` (tap-rest-api-msdk) polls the HTTP endpoints and loads to raw schema
+   - Mirrors the real integration engine pattern (Mirth Connect → REST/S3) without the infrastructure
+
 ### Transform (dbt)
 
 ```
@@ -199,6 +218,7 @@ marts/            → Fact and dimension tables
 - `dim_provider` - NP/PA providers dimension
 - `dim_state` - State reference dimension
 - `fact_provider_case_load` - Daily case load metrics (grain: physician × date)
+- `fact_patient_encounters` - ADT admission events enriched with EMR encounter data (grain: visit)
 
 ### Orchestration
 
