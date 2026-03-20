@@ -140,3 +140,44 @@ models:
         tests:
           - accepted_values:
               values: ['finished', 'in-progress', 'planned']
+
+  - name: stg_hl7__admissions
+    description: Staged HL7v2 ADT^A01 admission messages from S3 CSV
+    columns:
+      - name: message_id
+        description: HL7 message control ID
+        tests:
+          - unique
+          - not_null
+      - name: patient_class
+        description: Patient class (I=Inpatient, E=Emergency, O=Outpatient)
+        tests:
+          - accepted_values:
+              values: ['I', 'E', 'O']
+
+  - name: stg_hl7__discharges
+    description: Staged HL7v2 ADT^A03 discharge messages from S3 CSV
+    columns:
+      - name: message_id
+        description: HL7 message control ID
+        tests:
+          - unique
+          - not_null
+      - name: patient_class
+        description: Patient class (I=Inpatient, E=Emergency, O=Outpatient)
+        tests:
+          - accepted_values:
+              values: ['I', 'E', 'O']
+
+  - name: stg_hl7__lab_results
+    description: Staged HL7v2 ORU^R01 lab result OBX segments from S3 CSV
+    columns:
+      - name: message_id
+        description: HL7 message control ID (not unique — multiple OBX per message)
+        tests:
+          - not_null
+      - name: abnormal_flag
+        description: Abnormality indicator from OBX segment
+        tests:
+          - accepted_values:
+              values: ['N', 'L', 'H', 'LL', 'HH']
